@@ -889,6 +889,12 @@ namespace orc {
 
     std::unique_ptr<proto::PostScript> postscript =
       std::unique_ptr<proto::PostScript>(new proto::PostScript());
+    if (readSize < 1 + postscriptSize) {
+      std::stringstream msg;
+      msg << "Invalid ORC postscript length: " << postscriptSize << ", file length = "
+          << stream->getLength();
+      throw ParseError(msg.str());
+    }
     if (!postscript->ParseFromArray(ptr + readSize - 1 - postscriptSize,
                                    static_cast<int>(postscriptSize))) {
       throw ParseError("Failed to parse the postscript from " +
@@ -997,8 +1003,13 @@ namespace orc {
         buffer, postscriptLength));
       uint64_t footerSize = contents->postscript->footerlength();
       uint64_t tailSize = 1 + postscriptLength + footerSize;
-      uint64_t footerOffset;
+      if (tailSize >= fileLength) {
+        std::stringstream msg;
+        msg << "Invalid ORC tailSize=" << tailSize << ", fileLength=" << fileLength;
+        throw ParseError(msg.str());
+      }
 
+      uint64_t footerOffset;
       if (tailSize > readSize) {
         buffer->resize(footerSize);
         stream->read(buffer->data(), footerSize, fileLength - tailSize);
